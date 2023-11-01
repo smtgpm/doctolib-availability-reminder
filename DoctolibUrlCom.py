@@ -1,6 +1,12 @@
+import json
+import utils
 import requests
 from enum import Enum
+from pathlib import Path
 from datetime import datetime
+
+CURR_FOLDER = Path(__file__).parent.resolve()
+URL_COM_FILE = CURR_FOLDER/"conf"/"url_com.json"
 
 
 class UrlType(Enum):
@@ -39,12 +45,29 @@ class DoctolibUrlCom(metaclass=Singleton):
     of requests as to not become banned, so there should only be one instance of this class
     """
     def __init__(self):
-        self._requests_dates = {
-            UrlType.MAIN_DOCTOLIB_FR: [],
-            UrlType.AVALIABILITIES: [],
-            UrlType.ONLINE_BOOKING: []
+        url_com_data = utils.get_json_data(URL_COM_FILE)
+        if url_com_data and set('MAIN_DOCTOLIB_FR', 'AVALIABILITIES', 'ONLINE_BOOKING').issubset(url_com_data.keys()):
+            self._requests_dates = {
+                UrlType.MAIN_DOCTOLIB_FR: url_com_data['MAIN_DOCTOLIB_FR'],
+                UrlType.AVALIABILITIES: url_com_data['AVALIABILITIES'],
+                UrlType.ONLINE_BOOKING: url_com_data['ONLINE_BOOKING']
+            }
+        else:
+            self._requests_dates = {
+                UrlType.MAIN_DOCTOLIB_FR: [],
+                UrlType.AVALIABILITIES: [],
+                UrlType.ONLINE_BOOKING: []
+            }
+
+    def __del__(self):
+        dump_data = {
+            'MAIN_DOCTOLIB_FR': self._requests_dates[UrlType.MAIN_DOCTOLIB_FR],
+            'AVALIABILITIES':self._requests_dates[UrlType.AVALIABILITIES],
+            'ONLINE_BOOKING':self._requests_dates[UrlType.ONLINE_BOOKING]
         }
-  
+        with open(URL_COM_FILE, 'w') as f:
+            json.dump(dump_data, f, indent=4, sort_keys=True, default=str)
+
     def request_from_json_url(self, url):
         """
         will extract the data from given url (needs to be in json format) if the rate is within allowed limits

@@ -3,7 +3,6 @@ For now works only for single page
 """
 import utils
 from pathlib import Path
-from datetime import datetime
 from EmailSender import EmailSender
 from Practitionner import Practitionner
 from DoctolibUrlCom import DoctolibUrlCom
@@ -73,15 +72,13 @@ def main():
     doctolib_url_com = DoctolibUrlCom()
     conf_data = utils.get_json_data(CONF_FILE)
     if conf_data:
-        all_practitionners, dist, pids = fetch_practitionners(conf_data)
-
+        all_practitionners, dist, _ = fetch_practitionners(conf_data)
         email_message = ""
 
         for i in range(len(all_practitionners)):
-            print(f"{all_practitionners[i]} ({pids[i]}) à une distance de {dist[i]}km de votre adresse")
             p = Practitionner(all_practitionners[i], conf_data["visiting_motive_keywords"], conf_data["visiting_motive_forbidden_keywords"])
-            useful_pract = p.fetch_data_from_name()
-            if not useful_pract:
+            useful_practitionner = p.fetch_data_from_name()
+            if not useful_practitionner:
                 continue
             p.get_next_available_appointments()
             if p.next_slots:
