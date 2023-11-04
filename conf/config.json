@@ -5,9 +5,9 @@
   "street_name": "cours de vincennes",
 
   "max_dist_from_address_km": 5.0,
-  "practitionner_type": "rhumatologue",
-  "visiting_motive_keywords": ["première", "consultation"],
-  "visiting_motive_forbidden_keywords": ["suivi"],
+  "Practitioner_type": "rhumatologue",
+  "visiting_motive_keywords": ["première", "consultation", "rhumatologie"],
+  "visiting_motive_forbidden_keywords": ["suivi", "chirurgie", "vaccin"],
 
   "//max_date_slot_for_reminder": "format: YYYY-MM-DD. latest date at which you would like a reminder of open slot",
   "max_date_slot_for_reminder": "",
@@ -15,6 +15,6 @@
   "max_days_from_today_for_reminder": 15,
 
   "prog_behavior":{
-    "doctolib_request_rate_hrs": 1000.0
+    "doctolib_request_rate_hrs": 24.0
   }
 }

@@ -4,7 +4,7 @@ For now works only for single page
 import utils
 from pathlib import Path
 from EmailSender import EmailSender
-from Practitionner import Practitionner
+from Practitioner import Practitioner
 from DoctolibUrlCom import DoctolibUrlCom
 
 # available titles to be removed from names_with_titles
@@ -13,37 +13,37 @@ CURR_FOLDER = Path(__file__).parent.resolve()
 CONF_FILE = CURR_FOLDER/"conf"/"config.json"
 
 
-def generate_doctolib_search_url(practitionner_type, city, street_name):
+def generate_doctolib_search_url(Practitioner_type, city, street_name):
     """
-    creates the doctolib json URL that will return all available practitionners
-    around given address. street_name should not contain the number. regarding practitionner type, 
+    creates the doctolib json URL that will return all available Practitioners
+    around given address. street_name should not contain the number. regarding Practitioner type, 
     please go on doctolib.fr, do a research of what type you would like, and extract the type
     from the URL. For example, when searching for 'ORL', it generates this link:
     https://www.doctolib.fr/orl-oto-rhino-laryngologie/toulouse, so the type is orl oto rhino laryngologie
-    :param practitionner_type - String
+    :param Practitioner_type - String
     :param city - String
     :param street_name - String
     """
     # Base URL
-    practitionner_type = practitionner_type.replace(" ", "-").lower()
+    Practitioner_type = Practitioner_type.replace(" ", "-").lower()
     city = city.replace(" ", "-").lower()
     street_name = street_name.replace(" ", "-").lower()
     base_url = "https://www.doctolib.fr/"
 
     # Construct the URL
-    url = f"{base_url}{practitionner_type}/{city}-{street_name}"
+    url = f"{base_url}{Practitioner_type}/{city}-{street_name}"
     return url
 
 
-def fetch_practitionners(config):
+def fetch_Practitioners(config):
     """
-    will fetch all practitionners around given address within wanted distance (cf config.json)
+    will fetch all Practitioners around given address within wanted distance (cf config.json)
     :param config - dict : config.json data
     """
     # first we generate the search url that will be requested from doctolib.fr
     url = generate_doctolib_search_url(city=config["city"],
                                        street_name=config["street_name"],
-                                       practitionner_type=config["practitionner_type"])
+                                       Practitioner_type=config["Practitioner_type"])
     max_dist_km = 10000.0
     if config["max_dist_from_address_km"]:
         max_dist_km = float(config["max_dist_from_address_km"])
@@ -72,17 +72,20 @@ def main():
     doctolib_url_com = DoctolibUrlCom()
     conf_data = utils.get_json_data(CONF_FILE)
     if conf_data:
-        all_practitionners, dist, _ = fetch_practitionners(conf_data)
+        all_Practitioners, dist, _ = fetch_Practitioners(conf_data)
         email_message = ""
 
-        for i in range(len(all_practitionners)):
-            p = Practitionner(all_practitionners[i], conf_data["visiting_motive_keywords"], conf_data["visiting_motive_forbidden_keywords"])
-            useful_practitionner = p.fetch_data_from_name()
-            if not useful_practitionner:
+        for i in range(len(all_Practitioners)):
+            p = Practitioner(all_Practitioners[i],
+                             conf_data["Practitioner_type"],
+                             conf_data["visiting_motive_keywords"],
+                             conf_data["visiting_motive_forbidden_keywords"])
+            useful_Practitioner = p.fetch_data_from_name()
+            if not useful_Practitioner:
                 continue
             p.get_next_available_appointments()
             if p.next_slots:
-                email_message += f"Practitionner : {p.name}\n" +\
+                email_message += f"Practitioner : {p.name}\n" +\
                                  f"Type : {p.speciality}\n"+\
                                  f"Distance from address : {dist[i]} km\n"+\
                                  f"Next available slots :\n"
@@ -90,9 +93,9 @@ def main():
                     email_message += f"{p.visit_motives[motive_id]} : {p.next_slots[motive_id].split('T')[0]}\n"
                 email_message += "\n\n"
     es = EmailSender.from_file()
-    es.create_email_message(subject="next slots on doctolib",
+    es.create_email_message(subject="Doctolib Availability Reminder : slots available !",
                             message=email_message,
-                            recipients="test@gmail.com")
+                            recipients="mail@pm.com")
     es.send_email()
 
 if __name__ == "__main__":

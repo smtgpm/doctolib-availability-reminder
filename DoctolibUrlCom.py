@@ -6,7 +6,7 @@ from pathlib import Path
 from datetime import datetime
 
 CURR_FOLDER = Path(__file__).parent.resolve()
-URL_COM_FILE = CURR_FOLDER/"conf"/"url_com.json"
+URL_COM_FILE = CURR_FOLDER/"doctolib_url_com_data"/"url_com.json"
 
 
 class UrlType(Enum):
@@ -25,9 +25,9 @@ REQUEST_TIME_LIMIT_S = {
 }
 # numbner of requests allowed within the time limit
 REQUEST_RATE_PER_TIME_LIMIT = {
-    UrlType.MAIN_DOCTOLIB_FR: 50,
-    UrlType.AVALIABILITIES:   50,
-    UrlType.ONLINE_BOOKING:   50
+    UrlType.MAIN_DOCTOLIB_FR: 5000,
+    UrlType.AVALIABILITIES:   5000,
+    UrlType.ONLINE_BOOKING:   5000
 }
 
 class Singleton(type):
@@ -46,7 +46,7 @@ class DoctolibUrlCom(metaclass=Singleton):
     """
     def __init__(self):
         url_com_data = utils.get_json_data(URL_COM_FILE)
-        if url_com_data and set('MAIN_DOCTOLIB_FR', 'AVALIABILITIES', 'ONLINE_BOOKING').issubset(url_com_data.keys()):
+        if url_com_data and {'MAIN_DOCTOLIB_FR', 'AVALIABILITIES', 'ONLINE_BOOKING'}.issubset(url_com_data.keys()):
             self._requests_dates = {
                 UrlType.MAIN_DOCTOLIB_FR: url_com_data['MAIN_DOCTOLIB_FR'],
                 UrlType.AVALIABILITIES: url_com_data['AVALIABILITIES'],
@@ -58,14 +58,18 @@ class DoctolibUrlCom(metaclass=Singleton):
                 UrlType.AVALIABILITIES: [],
                 UrlType.ONLINE_BOOKING: []
             }
+        self._builtin_open = open  # to be able to call it during destruction 
 
     def __del__(self):
+        self.dump_to_url_com_file()
+
+    def dump_to_url_com_file(self):
         dump_data = {
             'MAIN_DOCTOLIB_FR': self._requests_dates[UrlType.MAIN_DOCTOLIB_FR],
             'AVALIABILITIES':self._requests_dates[UrlType.AVALIABILITIES],
             'ONLINE_BOOKING':self._requests_dates[UrlType.ONLINE_BOOKING]
         }
-        with open(URL_COM_FILE, 'w') as f:
+        with self._builtin_open(URL_COM_FILE, 'w') as f:
             json.dump(dump_data, f, indent=4, sort_keys=True, default=str)
 
     def request_from_json_url(self, url):
@@ -74,7 +78,7 @@ class DoctolibUrlCom(metaclass=Singleton):
         """
         # Parse the JSON content
         url_type = self.get_url_type(url)
-        if self.is_request_allowed(url):
+        if self.is_request_allowed(url_type):
             try:
                 headers = {
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
@@ -87,6 +91,7 @@ class DoctolibUrlCom(metaclass=Singleton):
                 print(str(e))
                 return None
             self._requests_dates[url_type].append(datetime.now())
+            self.dump_to_url_com_file()
             return json_data
         else:
             return None

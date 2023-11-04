@@ -16,21 +16,21 @@ def get_json_data(json_file_path):
             with json_file_path.open() as json_file:
                 json_data = json.load(json_file)
         except Exception as e:
-            print(f"failed to load json data from {json_file} : {str(e)}")
+            print(f"failed to load json data from {json_file_path} : {str(e)}")
             return None
     else:
-        print(f"couldn't properly locate json file {json_file}")
+        print(f"couldn't properly locate json file {json_file_path}")
         return None
     return json_data
 
 
-def fetch_json_data_from_url(url, max_hours_before_reset=1000.0):
+def fetch_json_data_from_url(url, max_hours_before_reset=24.0):
     """
     This will fetch the json data from given URL. Since doctolib.fr is very limiting in the number
     of requests allowed, the data is stored in json files and if the json file associated to the URL
     exists, the data will be taken from that file instead of an URL request. 
     In case the json file was created more hours ago than max_hours_before_reset, we reset the json
-    file by requesting from URL the data. 0 will always be resetting
+    file by requesting from URL the data. 0.0 will always be resetting
     :param max_hours_before_reset - float
     """
     curr_time = datetime.now()
@@ -56,7 +56,7 @@ def fetch_json_data_from_url(url, max_hours_before_reset=1000.0):
         data["dump_time"] = curr_time
         if json_data_file == "":
             # create a new XX.json file
-            json_data_file = str(len([f for f in url_requests_folder.iterdir() and f.is_file() and json_file.suffix == ".json"])) + ".json"
+            json_data_file = str(len([f for f in url_requests_folder.iterdir() if f.is_file() and f.suffix == ".json"])) + ".json"
         with open(url_requests_folder / json_data_file, 'w') as f:
             json.dump(data, f, indent=4, sort_keys=True, default=str)
         return json_data
