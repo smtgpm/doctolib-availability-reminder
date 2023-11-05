@@ -1,20 +1,15 @@
 {
-  "city": "Paris",
+  "city": "Toulouse",
 
   "//street_name": "for the street_name value, add the street type (ie: rue, avenue, cours) and do not add the street number",
-  "street_name": "cours de vincennes",
+  "street_name": "rue saint bernard",
 
   "max_dist_from_address_km": 5.0,
-  "Practitioner_type": "rhumatologue",
+  "practitioner_type": "rhumatologue",
   "visiting_motive_keywords": ["première", "consultation", "rhumatologie"],
   "visiting_motive_forbidden_keywords": ["suivi", "chirurgie", "vaccin"],
 
   "//max_date_slot_for_reminder": "format: YYYY-MM-DD. latest date at which you would like a reminder of open slot",
   "max_date_slot_for_reminder": "",
-
-  "max_days_from_today_for_reminder": 15,
-
-  "prog_behavior":{
-    "doctolib_request_rate_hrs": 24.0
-  }
+  "max_days_from_today_for_reminder": 20
 }

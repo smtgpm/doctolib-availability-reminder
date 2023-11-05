@@ -1,7 +1,8 @@
 import json
 from pathlib import Path
 from datetime import datetime
-from DoctolibUrlCom import DoctolibUrlCom
+
+from sample.DoctolibUrlCom import DoctolibUrlCom
 
 CURR_FOLDER = Path(__file__).parent.resolve()
 
@@ -24,6 +25,7 @@ def get_json_data(json_file_path):
     return json_data
 
 
+# not used, only for testing to avoid making requests, this can store requested pages into jsons, and call these jsons later on instead of requesting from net
 def fetch_json_data_from_url(url, max_hours_before_reset=24.0):
     """
     This will fetch the json data from given URL. Since doctolib.fr is very limiting in the number
@@ -62,3 +64,25 @@ def fetch_json_data_from_url(url, max_hours_before_reset=24.0):
         return json_data
     else:
         return None
+    
+
+def compare_dates(date1, date2):
+    """
+    compares string dates. Dates should have format YYYY-MM-DD. Returns 1 if date1>date2, 0 if equal, -1 if date1<date2
+    """
+    if int(date1.split("-")[0]) > int(date2.split("-")[0]):
+        return 1
+    elif int(date1.split("-")[0]) < int(date2.split("-")[0]):
+        return -1
+    else:
+        if int(date1.split("-")[1]) > int(date2.split("-")[2]):
+            return 1
+        elif int(date1.split("-")[1]) < int(date2.split("-")[2]):
+            return -1
+        else:
+            if int(date1.split("-")[1]) > int(date2.split("-")[2]):
+                return 1
+            elif int(date1.split("-")[1]) < int(date2.split("-")[2]):
+                return -1
+            else:
+                return 0

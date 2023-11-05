@@ -1,12 +1,24 @@
+"""
+This file is in between any requests made towards doctolib.fr. It'll track the amount made, can be used tu limit and control the 
+number of requests made.
+TODO: use it more appropriately, check the allowed number of requests of every call made to doctolib and tune this file in accordance to it
+"""
 import json
-import utils
-import requests
+
 from enum import Enum
 from pathlib import Path
 from datetime import datetime
 
+import sample.utils as utils
+
+try:
+    import requests
+except ModuleNotFoundError:
+    import requirements.requests as requests
+
+
 CURR_FOLDER = Path(__file__).parent.resolve()
-URL_COM_FILE = CURR_FOLDER/"doctolib_url_com_data"/"url_com.json"
+URL_COM_FILE = CURR_FOLDER.parent/"data"/"doctolib_url_com_data.json"
 
 
 class UrlType(Enum):
@@ -90,7 +102,7 @@ class DoctolibUrlCom(metaclass=Singleton):
                 print("Error: Unable to fetch JSON data from the URL.")
                 print(str(e))
                 return None
-            self._requests_dates[url_type].append(datetime.now())
+            self._requests_dates[url_type].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"))
             self.dump_to_url_com_file()
             return json_data
         else:
@@ -107,7 +119,7 @@ class DoctolibUrlCom(metaclass=Singleton):
         
         curr_time = datetime.now()
         # first we clean the _requests_dates
-        self._requests_dates[url_type] = [d for d in self._requests_dates[url_type] if (curr_time - d).total_seconds() < REQUEST_TIME_LIMIT_S[url_type]]
+        self._requests_dates[url_type] = [d for d in self._requests_dates[url_type] if (curr_time - datetime.strptime(d, '%Y-%m-%d %H:%M:%S.%f')).total_seconds() < REQUEST_TIME_LIMIT_S[url_type]]
         return len(self._requests_dates[url_type]) < REQUEST_RATE_PER_TIME_LIMIT[url_type]
 
     @staticmethod

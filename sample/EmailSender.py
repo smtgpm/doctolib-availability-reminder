@@ -1,11 +1,18 @@
-import utils
+"""
+Class that'll allow the email reminders. For now it only supports the smtp way.
+TODO: improve credentials handeling
+TODO: allow other type of email sending
+TODO: Error management
+"""
+import os
 import smtplib
 from pathlib import Path
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+import sample.utils as utils
+
 CURR_FOLDER = Path(__file__).parent.resolve()
-SMTP_CONF_FILE = CURR_FOLDER/"conf"/"email_smtp_config.json"
 
 
 class EmailSender:
@@ -18,7 +25,7 @@ class EmailSender:
         self.error = ""
     
     @classmethod
-    def from_file(cls, json_file=SMTP_CONF_FILE):
+    def from_file(cls, json_file):
         smtp_conf_data = utils.get_json_data(json_file)
         if smtp_conf_data:
             server_name = smtp_conf_data['server_name']
@@ -29,12 +36,23 @@ class EmailSender:
         else:
             raise Exception(f"couldn't initialize with json file {json_file}")
 
-    def create_email_message(self, subject, message, recipients):
+    @classmethod
+    def from_env(cls):
+        server_name = os.environ['ES_SERVER_NAME']
+        port_number = int(os.environ['ES_PORT_NUMBER'])
+        email_user_name = os.environ['ES_EMAIL_USER_NAME']
+        email_password = os.environ['ES_EMAIL_PASSWORD']
+        return cls(server_name, port_number, email_user_name, email_password)
+
+    def create_email_message(self, subject, message, recipients=None):
         """
         Will create the email message object. Recipients can be multiple, should be all in
-        a single string separated by commas:'foo@bar.com, foo2@bar2.com'
+        a single string separated by commas:'foo@bar.com, foo2@bar2.com'. If None, receipients
+        will be taken from environment variable ES_RECEIPIENTS.
         """
         self.mime_message['From'] = self.email_user_name
+        if recipients is None:
+            recipients=os.environ['ES_RECIPIENTS']
         self.mime_message['To'] = recipients
         self.mime_message['Subject'] = subject
         # Attach the message
@@ -58,3 +76,8 @@ class EmailSender:
         """
         print(self.error)
         self.error = None
+
+if __name__ == "__main__":
+    es = EmailSender().from_env()
+    es.create_email_message(subject="Test mail", message="Here is an email for you.", recipients="smtgpm@pm.me")
+    es.send_email()
