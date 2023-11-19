@@ -1,0 +1,56 @@
+
+#################################
+########## MAIN_CONFIG ##########
+#################################
+# if set to true, please refer to the SEARCH_AROUND_ADDRESS section for additional configuration
+search_around_address: false
+
+# following keywords are used to narrow the parsing. Each practitionner does not have the same availability for all their
+# visiting motives, so adding keywords will make the reminders more precise as you won't be reminded for unwanted visiting motives.
+# the reminding will be done for the visiting motives that have the most matching keywords. If there are equalities, they will all be parsed
+visiting_motive_keywords:
+  - première
+  - consultation
+
+# if any of the following keywords is present in a visiting_motive, this motive will not be parsed for vailability.
+visiting_motive_forbidden_keywords:
+  - suivi
+  - chirurgie
+  - vaccin
+
+# set a max date for reminder. Format YYYY-MM-DD.
+# Any practitioner availability after this date will be ignored. If you set to empty or to a date previous to today, it'll be ignored
+max_date_slot_for_reminder:
+
+# set a maximum number of days from today for reminders. Any available slot after that data will be ignored.
+max_days_from_today_for_reminder: 20
+
+# Here you can add any practitioner profile URL to be added to the reminder checks. This can be in addition to search_around_address.
+# Simply go on doctolib.fr, and copy paste all the profile's URLs you want to parse
+profile_urls:
+  - https://www.doctolib.fr/orl-chirurgien-de-la-face-et-du-cou/paris/youssef-el-hallaoui?pid=practice-182369
+  - https://www.doctolib.fr/medecin-generaliste/la-mure/bernard-perret
+  - https://www.doctolib.fr/masseur-kinesitherapeute/biarritz/juliette-ballarin?pid=practice-182142
+
+
+#################################
+##### SEARCH_AROUND_ADDRESS #####
+#################################
+# this section is if user has set search_around_address to true. If so, the program will look 
+# around given address for all practitioners of {practitioner_type} and then check each of their
+# availability. You can set the max distance fot the program to look for from your address
+
+## User address 
+city: Toulouse
+street_name: rue des lois
+street_number: 1
+
+# Max distance from address to look for [km] 
+max_dist_from_address_km: 5.0
+
+# Following keyword needs to be properly set. Go on http://www.doctolib.fr and do a random search for the practitioner
+# type you want. You'll get an url that looks like this : https://www.doctolib.fr/<practitioner_type>/<address_and_other_stuff>
+# pick the <practitioner_type> and add this in following keyword. You can have the program look for several types of practitioners
+practitioner_types:
+  - orl-oto-rhino-laryngologie
+

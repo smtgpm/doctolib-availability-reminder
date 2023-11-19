@@ -3,18 +3,16 @@ This file is in between any requests made towards doctolib.fr. It'll track the a
 number of requests made.
 TODO: use it more appropriately, check the allowed number of requests of every call made to doctolib and tune this file in accordance to it
 """
+import sys
 import json
+import requests
 
 from enum import Enum
 from pathlib import Path
 from datetime import datetime
 
-import sample.utils as utils
-
-try:
-    import requests
-except ModuleNotFoundError:
-    import requirements.requests as requests
+sys.path.insert(0, "sample")
+import utils
 
 
 CURR_FOLDER = Path(__file__).parent.resolve()
@@ -57,7 +55,8 @@ class DoctolibUrlCom(metaclass=Singleton):
     of requests as to not become banned, so there should only be one instance of this class
     """
     def __init__(self):
-        url_com_data = utils.get_json_data(URL_COM_FILE)
+        url_com_data = utils.get_file_json_data(URL_COM_FILE)
+        self.logger =  utils.logger
         if url_com_data and {'MAIN_DOCTOLIB_FR', 'AVALIABILITIES', 'ONLINE_BOOKING'}.issubset(url_com_data.keys()):
             self._requests_dates = {
                 UrlType.MAIN_DOCTOLIB_FR: url_com_data['MAIN_DOCTOLIB_FR'],
@@ -99,12 +98,11 @@ class DoctolibUrlCom(metaclass=Singleton):
                 response.raise_for_status()  # Check for any request errors
                 json_data = response.json()
             except requests.exceptions.RequestException as e:
-                print("Error: Unable to fetch JSON data from the URL.")
-                print(str(e))
+                self.logger.error(f"Error: Unable to fetch JSON data from the URL: {e}")
                 return None
             self._requests_dates[url_type].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"))
             self.dump_to_url_com_file()
-            return json_data
+            return utils.CustomJSON(json_data)
         else:
             return None
     

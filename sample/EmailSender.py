@@ -5,28 +5,35 @@ TODO: allow other type of email sending
 TODO: Error management
 """
 import os
+import sys
 import smtplib
 from pathlib import Path
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-import sample.utils as utils
+sys.path.insert(0, "sample")
+import utils
 
 CURR_FOLDER = Path(__file__).parent.resolve()
 
 
 class EmailSender:
     def __init__(self, server_name, port_number, email_user_name, email_password):
+        self.logger = utils.logger
         self.server_name = server_name
         self.port_number = port_number
         self.email_user_name = email_user_name
         self.email_password = email_password
         self.mime_message = MIMEMultipart()
-        self.error = ""
     
     @classmethod
     def from_file(cls, json_file):
-        smtp_conf_data = utils.get_json_data(json_file)
+        """
+        In case you have your credentials in a json file:
+        keys: server_name, port_number, email_user_name, email_password
+        :param json_file : path to json file
+        """
+        smtp_conf_data = utils.get_file_json_data(json_file)
         if smtp_conf_data:
             server_name = smtp_conf_data['server_name']
             port_number = smtp_conf_data['port_number']
@@ -38,6 +45,10 @@ class EmailSender:
 
     @classmethod
     def from_env(cls):
+        """
+        In case you have your credentials as environment variables:
+        ES_SERVER_NAME, ES_PORT_NUMBER, ES_EMAIL_USER_NAME, ES_EMAIL_PASSWORD
+        """
         server_name = os.environ['ES_SERVER_NAME']
         port_number = int(os.environ['ES_PORT_NUMBER'])
         email_user_name = os.environ['ES_EMAIL_USER_NAME']
@@ -52,11 +63,16 @@ class EmailSender:
         """
         self.mime_message['From'] = self.email_user_name
         if recipients is None:
-            recipients=os.environ['ES_RECIPIENTS']
+            try:
+                recipients=os.environ['ES_RECIPIENTS']
+            except Exception as e:
+                self.logger.error("No reciepients were given to emailSender, and couldn't fetch any from ES_RECEIPIENTS's environment variable either.")
+                return False
         self.mime_message['To'] = recipients
         self.mime_message['Subject'] = subject
         # Attach the message
         self.mime_message.attach(MIMEText(message, 'plain'))
+        return True
 
     def send_email(self):
         try:
@@ -65,19 +81,13 @@ class EmailSender:
             self.server.login(self.email_user_name, self.email_password)
             self.server.sendmail(self.email_user_name, self.mime_message['To'], self.mime_message.as_string())
             self.server.quit()
-            print("Email sent successfully!")
+            self.logger.info("Email sent successfully!")
+            return True
         except Exception as e:
-            self.error = f"Error sending email reminder: {str(e)}"
-            self.trigger_error()
-
-    def trigger_error(self):
-        """
-        TODO: organize error behavior
-        """
-        print(self.error)
-        self.error = None
+            self.logger.error(f"Error sending email reminder: {str(e)}")
+            return False
 
 if __name__ == "__main__":
-    es = EmailSender().from_env()
-    es.create_email_message(subject="Test mail", message="Here is an email for you.", recipients="smtgpm@pm.me")
-    es.send_email()
+    es = EmailSender.from_env()
+    if es.create_email_message(subject="Test mail", message="Here is an email for you."):
+        es.send_email()

@@ -1,156 +1,176 @@
 """
 This class will regroup all the info per practitionner. can definetly be improved, the usage is too narrow still.
 """
-import re
+import sys
 
-import sample.utils as utils
-from sample.DoctolibUrlCom import DoctolibUrlCom
+sys.path.insert(0, "sample")
+import utils as utils
+from DoctolibUrlCom import DoctolibUrlCom
+
 TRANSLATION_TABLE = str.maketrans("ëéèêàïîô'ç", "eeeeaiio-c")
-
-def arrays_have_common_elements(array1, array2):
-    return len(list(filter(lambda x: x in array2, array1))) > 0
 
 
 class Practitioner:
     def __init__(self,
-                 name,
-                 speciality,
-                 distance=None,
-                 link=None,
-                 visiting_motive_keywords=[],
-                 visiting_motive_forbidden_keywords=[]):
-        """
-        initialises the Practitioner class (can also be an office). If user requests for visiting motive keywords, 
-        the visiting motive that matches the most keywords will be taken. In case of equality, all the highest
-        matching will be taken.
-        :param name - String : name or practice name but without title
-        :param speciality - String : speciality of the practitioner
-        :param [optional] distance - float : distance of practitioner. Only as info, not needed for processing
-        :param [optional] link - string : value found when parsing, useful only if available, no need to manually give this.
-        :param [optional] visiting_motive_keywords - array[strings] : list of keywords to look for in visit motives
-        :param [optional] visiting_motive_forbidden_keywords - array[strings] : list of keywords that will void a visit motives
-        """
-        self.name = name
-        self.speciality = speciality
-        self.distance = distance
-        self.link = link
-        self.next_slots = {}
-        self.agenda_ids = []
-        self.practice_ids = []
-        self.visit_motives = {}
-        self.visiting_motive_keywords = visiting_motive_keywords
-        self.visiting_motive_forbidden_keywords = visiting_motive_forbidden_keywords
-
-    def fetch_data_from_name(self):
-        """
-        will fetch json data based on the Practitioner's name, and sets necessary data for the class
-        """
-        name_for_url = self.name.replace(" ", "-").lower().translate(TRANSLATION_TABLE)
-        name_for_url = re.sub(r'-+', '-', name_for_url)
-        url = f"https://www.doctolib.fr/online_booking/draft/new.json?id={name_for_url}"
-        data = DoctolibUrlCom().request_from_json_url(url)
-        if data:
-            data = data.get("data", {})
-            spec_id = None
-            spec_log = ""
-            # firt we fetch the specialit id so that we can filter out any other practitionner in case there are more than 1
-            for speciality in data["specialities"]:
-                spec_log += f"id : {speciality['slug']}\n"
-                if self.speciality.lower().translate(TRANSLATION_TABLE) == speciality["slug"].lower().translate(TRANSLATION_TABLE) \
-                    or self.speciality.lower().translate(TRANSLATION_TABLE) == speciality["name"].lower().translate(TRANSLATION_TABLE):
-                    spec_id = speciality["id"]
-            if not spec_id:
-                print(f"[ERROR] no spec id found: your spec :\n {self.speciality.lower()},\n tested specs : {spec_log}\n")
-                return False
-
-            # fetch visit motives ids and their names. Only take the highest matching motives. If no visiting_motive_keywords was
-            # given, we'll be storing all of them.
-            motive_names = []
-            num_keyword_match = []
-            for visit_motive in data["visit_motives"]:
-                if visit_motive["speciality_id"] != spec_id:
-                    continue
-                if len([match for match in self.visiting_motive_forbidden_keywords if match.lower() in visit_motive["name"].lower()]) == 0:
-                    motive_names.append(visit_motive["name"])
-                    num_keyword_match.append(len([match for match in self.visiting_motive_keywords if match.lower() in visit_motive["name"].lower()]))
-            if not num_keyword_match:
-                return False
-            max_match = max(num_keyword_match)
-            for idx, item in enumerate(list(motive_names)):
-                if num_keyword_match[idx] != max_match:
-                    motive_names.remove(item)
+                 glob_type,
+                 slug_name,
+                 city,
+                 json_data):
+        self.is_ok = False
+        self.logger = utils.logger
+        try:
+            if not json_data["profile"]["speciality"] or \
+               not json_data["visit_motives"]         or \
+               not json_data["agendas"]                   :
+                raise Exception(f"the json_data provided is missing mandatory data, here is a dump of the data for debug:\n{json_data}")
+            self.glob_type = glob_type
+            self.slug_name = slug_name
+            self.city = city
+            self.next_slots = []
             
-            motive_ids = []
-            motive_category_ids = []
-            speciality_ids = []
-            organization_ids = []
-            for visit_motive in data["visit_motives"]:
-                if visit_motive["speciality_id"] != spec_id:
+            # fetch all necessary data :
+            self.speciality_id = json_data["profile"]["speciality"]["id"]
+            self.practitioner_name = json_data["profile"]["name_with_title"]
+            self.speciality_name = json_data["profile"]["speciality"]["name"]
+            
+            self.practice_id_address = {}
+            for place in json_data["places"]:
+                for practice_id in place["practice_ids"]:
+                    self.practice_id_address[practice_id] = f"{place['address']}, {place['zipcode']} {place['city']}"
+
+            self.visit_motives = {}
+            for vm in list(json_data["visit_motives"]):
+                if (vm["speciality_id"] != self.speciality_id):
                     continue
-                if visit_motive["name"] in motive_names:
-                    if "id" in visit_motive.keys(): 
-                        motive_ids.append(visit_motive["id"])
-                        self.visit_motives[visit_motive["id"]] = visit_motive["name"]
-                    if "speciality_id" in visit_motive.keys(): speciality_ids.append(visit_motive["speciality_id"])
-                    if "organization_id" in visit_motive.keys(): organization_ids.append(visit_motive["organization_id"])
-                    if "visit_motive_category_id" in visit_motive.keys(): motive_category_ids.append(visit_motive["visit_motive_category_id"])
-            # remove duplicates
-            motive_ids = list(dict.fromkeys(motive_ids))
-            motive_category_ids = list(dict.fromkeys(motive_category_ids))
-            speciality_ids = list(dict.fromkeys(speciality_ids))
-            organization_ids = list(dict.fromkeys(organization_ids))
- 
+                self.visit_motives[vm["id"]] = vm["name"].lower().translate(TRANSLATION_TABLE)
 
-            # fetch agenda ids
-            for agenda in data["agendas"]:
-                if not agenda["booking_disabled"] and not agenda["booking_temporary_disabled"]:
-                    if len(agenda['visit_motive_ids']) > 0 and arrays_have_common_elements(agenda['visit_motive_ids'], motive_ids)  or\
-                        (agenda['organization_id'] and agenda['organization_id'] in organization_ids)                               or\
-                        (agenda['speciality_id'] and agenda['speciality_id'] in speciality_ids)                                     or\
-                        (agenda['visit_motive_ids'] and arrays_have_common_elements(agenda['visit_motive_ids'], motive_ids)):
+            self.agendas = {}
+            for ag in list(json_data["agendas"]):
+                if ag["booking_disabled"] or ag["booking_temporary_disabled"] or ag["speciality_id"] != self.speciality_id:
+                    continue
+                self.agendas[ag["id"]] = ag["visit_motive_ids_by_practice_id"]  # ag["visit_motive_ids_by_practice_id"] is a dictionnary :  key = practice id, item = [motive ids]
 
-                        self.agenda_ids.append(agenda["id"])
-                        if "practice_id" in agenda.keys(): self.practice_ids.append(agenda["practice_id"])
-            # remove duplicates
-            self.agenda_ids = list(dict.fromkeys(self.agenda_ids))
-            self.practice_ids = list(dict.fromkeys(self.practice_ids))
-            if not self.visit_motives or not self.agenda_ids or not self.practice_ids:
-                # not a useful practitioner in our case
-                return False
+            self.is_ok = True
+            self.logger.info(f"Practitioner {self.practitioner_name}'s object was successfully created")
+        except Exception as e:
+            self.logger.error(f"Failed to create a Practitionner object:\n{e}")
 
-            return True
+    
+    @classmethod
+    def from_url(cls, profile_url):
+        """
+        :param profile_url - url copy pasted from doctolib.fr's profile
+        """
+        purl = profile_url
+        if "doctolib.fr/" in purl:
+            purl = purl.split("doctolib.fr/")[1]  # remove first part of the name
+            purl = purl.split("?")[0]             # remove any aditional unecessary parameters at end of link
+        splitted_link = purl.split("/")
+        if len(splitted_link) != 3:
+            cls.logger.error(f"[ERROR] link {profile_url} does not have format 'type/city/name'.")
+            return
+        glob_type = splitted_link[0]
+        city = splitted_link[1]
+        slug_name = splitted_link[2]
 
-    def get_next_available_appointments(self):
-        """ """
+        # fetch all necessary data to sort out and classify our profile(s)
+        url = f"https://www.doctolib.fr/online_booking/draft/new.json?id={slug_name}"
+        json_data = DoctolibUrlCom().request_from_json_url(url)
+        if json_data is None:
+            cls.logger.error(f"[ERROR] link {url} couldn't fetch the json data. Does {profile_url} have the format (...)doctolib.fr/type/city/name(...) ?")
+            return
+        
+        json_data = json_data.get("data", {})
+        # if data["profile"]["speciality"] exists and is not null and not an array, this means we have a practitionner. 
+        # Else it is a center/pharmacy/hospital and thus needs trimming
+        if json_data["profile"]["speciality"]:
+            return cls(glob_type, slug_name, city, json_data)
+        else:
+            cls.logger.error(f"Problem when trying to fetch speciality in profiles url : {url}")
+            return
+
+    def narrow_search_based_on_keywords(self, keywords=[], forbidden_keywords=[]):
+        """
+        Some practitionners have way too many agendas and/or visit motives, and he/she might have an abailability on some visit motive
+        that does not interest the user. So this function is to trim any agenda/visit_motive that is not required to be looked at
+        """
+        keywords = [k.lower().translate(TRANSLATION_TABLE) for k in keywords]
+        forbidden_keywords = [k.lower().translate(TRANSLATION_TABLE) for k in forbidden_keywords]
+        self.logger.info(f"Removing any visit_motive or agenda to narrow the availability search.\nLooking for these keywords: {keywords}\nRefusing these keywords:{forbidden_keywords}")
+
+        # first we trim the visit motives. We'll remove any motive that has a forbidden keyword, and keep the ones that have the
+        # highest number of matches with keywords
+        highest_num_of_keyword_matches = 0
+        for _, motive in self.visit_motives.items():
+            highest_num_of_keyword_matches = max(highest_num_of_keyword_matches, sum(k in motive for k in keywords))
+
+        motiv_ids_to_remove = []
+        for id, motive in self.visit_motives.items():
+            if any(word in motive for word in forbidden_keywords) or sum(word in motive for word in keywords) < highest_num_of_keyword_matches:
+                motiv_ids_to_remove.append(id)
+
+        # Removing items from 'self.visit_motives' based on 'motiv_ids_to_remove'
+        for id in motiv_ids_to_remove:
+            self.visit_motives.pop(id, None)
+
+        # no we can trim the agendas
+        agenda_ids_to_remove = []
+        visit_motive_ids = list(self.visit_motives.keys())
+        for agenda_id, visit_motive_ids_by_practice_id in self.agendas.items():
+            practice_ids_to_remove = []
+            for practice_id, agenda_motive_ids in visit_motive_ids_by_practice_id.items():
+                if not utils.arrays_have_common_elements(agenda_motive_ids, visit_motive_ids):
+                    practice_ids_to_remove.append(practice_id)
+            # Removing items from 'visit_motive_ids_by_practice_id' based on 'practice_ids_to_remove'
+            for practice_id in practice_ids_to_remove:
+                visit_motive_ids_by_practice_id.pop(practice_id, None)
+            if len(visit_motive_ids_by_practice_id) == 0:
+                agenda_ids_to_remove.append(agenda_id)
+        # Removing items from 'self.agendas' based on 'agenda_ids_to_remove'
+        for agenda_id in agenda_ids_to_remove:
+            self.agendas.pop(agenda_id, None)
+
+        if len(self.visit_motives) == 0 or len(self.agendas) == 0:
+            self.logger.error("There are no more available agendas or visit_motives. Verify your 'forbidden_keywords' as they might be too restrictive")
+            return None
+        self.logger.info(f"SUCCESS: {len(motiv_ids_to_remove)} visit_motives have been removed and {len(agenda_ids_to_remove)} agendas.")
+
+    def get_next_available_appointment(self):
+        """ will parse all agendas and visit motives of current practitionner, and look at the next available slots """
+        self.logger.info("Looking into the agendas and visit motives, and checking the next available slots...")
+        found_slot = False
         start_day = "2000-01-01"  # we take an old day to make sure no appointment will be available, so we can simply fetch the "next_slot" value
-        for practice_id in self.practice_ids:
-            for visit_motive_id in self.visit_motives.keys():
-                for agenda_id in self.agenda_ids:
+        for motive_id, _ in self.visit_motives.items():
+            for agenda_id, visit_motive_ids_by_practice_id in self.agendas.items():
+                for practice_id, _ in visit_motive_ids_by_practice_id.items():
                     url_to_check = f"https://www.doctolib.fr/availabilities.json?" +\
-                                   f"start_date={start_day}&"                      +\
-                                   f"visit_motive_ids={visit_motive_id}&"          +\
-                                   f"agenda_ids={agenda_id}&"                      +\
-                                   f"practice_ids={practice_id}&limit=2"
-                    data = DoctolibUrlCom().request_from_json_url(url_to_check)
-                    if data:
-                        if "next_slot" in data.keys():
-                            self.next_slots[visit_motive_id] = data["next_slot"]
-
-    def available_slot_before_date(self, max_date):
-        """
-        returns empty dict if no available slot, else returns dict[motives]=dates
-        :param max_date - format YYYY-MM-DD
-        """
-        ret = {}
-        if self.next_slots:
-            for motive, slot in self.next_slots.items():
-                date = slot.split("T")[0]
-                if  utils.compare_dates(date, max_date) <= 0:
-                    ret[motive] = slot
-        return ret
-
+                                    f"start_date={start_day}&"                     +\
+                                    f"visit_motive_ids={motive_id}&"      +\
+                                    f"agenda_ids={agenda_id}&"                  +\
+                                    f"practice_ids={practice_id}&limit=2"
+                    json_data = DoctolibUrlCom().request_from_json_url(url_to_check)
+                    if json_data:
+                        if "next_slot" in json_data.keys() and "Aucune" not in json_data["next_slot"]:
+                            next_slot = {}
+                            next_slot["date"] = json_data["next_slot"].split("T")[0]
+                            next_slot["motive_id"] = motive_id
+                            next_slot["agenda_id"] = agenda_id
+                            next_slot["practice_id"] = int(practice_id)
+                            next_slot["send_reminder"] = False
+                            self.next_slots.append(next_slot)
+                            found_slot = True
+                            self.logger.info(f"Next available slot for {self.visit_motives[motive_id]} : {next_slot['date']}")
+        if not found_slot:
+            self.logger.info(f"This practitionner does not have any future available slots.")
+        return found_slot
 
 if __name__ == "__main__":
-    p = Practitioner("name", "ORL", ["premiere", "consultation", "ORL"], ["suivi", "chirurgie"])
-    a = p.fetch_data_from_name()
-    print(a)
+    my_pract = Practitioner.from_url("https://www.doctolib.fr/dentiste/paris/rita-halhal?pid=practice-3680")
+    if my_pract and my_pract.is_ok:
+        my_pract.narrow_search_based_on_keywords(keywords=["premiere", "consultation"], forbidden_keywords=["chirurgie"])
+        found_slot = my_pract.get_next_available_appointment()
+        if found_slot:
+            print(f"At least one available slot has been found for {my_pract.practitioner_name}:")
+            for slot in my_pract.next_slots:
+                print(f"for \"{my_pract.visit_motives[slot['motive_id']]}\", next available slot will be : {slot['date']} at {my_pract.practice_id_address[slot['practice_id']]}")
+            
