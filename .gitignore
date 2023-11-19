@@ -1,3 +1,4 @@
 conf/email_smtp_config.json
 url_requests/*
 __pycache__/*
+sample/__pycache__/*

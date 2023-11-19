@@ -3,7 +3,7 @@
 ########## MAIN_CONFIG ##########
 #################################
 # if set to true, please refer to the SEARCH_AROUND_ADDRESS section for additional configuration
-search_around_address: false
+search_around_address: true
 
 # following keywords are used to narrow the parsing. Each practitionner does not have the same availability for all their
 # visiting motives, so adding keywords will make the reminders more precise as you won't be reminded for unwanted visiting motives.
@@ -23,7 +23,7 @@ visiting_motive_forbidden_keywords:
 max_date_slot_for_reminder:
 
 # set a maximum number of days from today for reminders. Any available slot after that data will be ignored.
-max_days_from_today_for_reminder: 20
+max_days_from_today_for_reminder: 10
 
 # Here you can add any practitioner profile URL to be added to the reminder checks. This can be in addition to search_around_address.
 # Simply go on doctolib.fr, and copy paste all the profile's URLs you want to parse
@@ -42,6 +42,7 @@ profile_urls:
 
 ## User address 
 city: Toulouse
+zipcode: 31000
 street_name: rue des lois
 street_number: 1
 
@@ -52,5 +53,5 @@ max_dist_from_address_km: 5.0
 # type you want. You'll get an url that looks like this : https://www.doctolib.fr/<practitioner_type>/<address_and_other_stuff>
 # pick the <practitioner_type> and add this in following keyword. You can have the program look for several types of practitioners
 practitioner_types:
-  - orl-oto-rhino-laryngologie
+  - dentiste
 

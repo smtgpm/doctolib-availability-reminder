@@ -1,6 +1,7 @@
 import json
 import yaml
 import logging
+import inspect
 from pathlib import Path
 from datetime import datetime
 
@@ -17,6 +18,16 @@ class CustomLogger:
         console_handler = logging.StreamHandler()
         console_handler.setFormatter(formatter)
         self._logger.addHandler(console_handler)
+    
+    def _get_calling_class_name(self):
+        try:
+            stack = inspect.stack()
+            # Get the class name from the stack frame
+            class_name = stack[2][0].f_locals.get('self', None).__class__.__name__
+            return class_name
+        except Exception as e:
+            # In case of any exception, return 'UnknownClass'
+            return 'UnknownClass'
     
     def info(self, message):
         self._logger.info(message)

@@ -1,10 +1,12 @@
 """
 For now works only for single page
 """
+from sample.DoctolibUrlCom import DoctolibUrlCom
 from sample.AvailabilityReminder import AvailabilityReminder
 
 
-def main():
+def main(argc=None, argv=None):
+    duc = DoctolibUrlCom()
     ar = AvailabilityReminder()
     ar.run()
 

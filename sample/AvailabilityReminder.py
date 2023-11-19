@@ -6,8 +6,8 @@ from datetime import datetime, timedelta
 
 sys.path.insert(0, "sample")
 import utils
+from Practitioner import *
 from EmailSender import EmailSender
-from Practitioner import Practitioner
 from DoctolibUrlCom import DoctolibUrlCom
 
 CURR_FOLDER = Path(__file__).parent.resolve()
@@ -46,7 +46,8 @@ class AvailabilityReminder():
                                 "and set keep it to empty if you don't want any URLs to be added to parser")
             return False
         for url in self.config_data["profile_urls"]:
-            pract = Practitioner.from_url(url)
+            (name, json_data) = fetch_json_data_from_profile_url(url)
+            pract = Practitioner(name, json_data)
             if pract.is_ok:
                 self.practitioners.append(pract)
     
@@ -56,7 +57,10 @@ class AvailabilityReminder():
         """
         if not self.config_data["practitioner_types"]:
             self.logger.error("while requesting to look around address in the config, no practitioner type has been given to look for...")
-            return False            
+            return False
+
+        self.logger.info(f"starting to look for any practitionner that practice {self.config_data['practitioner_types']} around given address in config.yaml:\n"
+                         f"{self.config_data['street_number']}, {self.config_data['street_name']}\n{self.config_data['zipcode']}, {self.config_data['city']}")      
             
         for practitioner_type in list(self.config_data["practitioner_types"]):
             city = self.config_data["city"]
@@ -77,17 +81,63 @@ class AvailabilityReminder():
             json_data = DoctolibUrlCom().request_from_json_url(url)
             if json_data:
                 for doctor in json_data.get("data", {}).get("doctors", []):
-                    if float(doctor['distance']) < max_dist_km:
+                    if 'distance' not in doctor.keys() or float(doctor['distance']) < max_dist_km:
                         link = doctor['link']
                         url = base_url + link
-                        pract = Practitioner.from_url(url)
-                        if pract.is_ok:
-                            self.practitioners.append(pract)
+                        (name, json_data) = fetch_json_data_from_profile_url(url)
+                        if not json_data["profile"]["organization"]:
+                            # if it's a practitioner
+                            pract = Practitioner(name, json_data)
+                            if pract.is_ok:
+                                self.practitioners.append(pract)
+                        else:
+                            # this is an organization. We have to parse it and exctract all potential practitioners that practice config's practitioner_types
+                            self.logger.info(f"An organization was found: {name}\nLet's parse it to retrieve any practitioner that might be relevant...")
+                            pract_urls = self.fetch_practitioner_urls_from_organization(url)
+                            if pract_urls:
+                                for p_url in pract_urls:
+                                    (name, json_data) = fetch_json_data_from_profile_url(p_url)
+                                    if not json_data["profile"]["organization"]:
+                                        # if it's a practitioner
+                                        pract = Practitioner(name, json_data)
+                                        if pract.is_ok:
+                                            self.practitioners.append(pract)
+                            
                     else: # max distance has been reached, we can stop
                         break
             else:
                 return False
             return True
+
+    def fetch_practitioner_urls_from_organization(self, organization_profile_url):
+        """
+        will look into the json_data fetched directly from profile URL to get potentiel practitioner URLs that
+        exercise the same type as given in config.yaml
+        :param organization_profile_url - url copy pasted from doctolib.fr's profile.
+        :return practitioner_urls - list of URLS that correspond tu practitioner profiles
+        """
+        practitioner_urls = []
+        p_url = organization_profile_url
+        if "doctolib.fr/" not in p_url:
+            self.logger.error(f"Organization URL is wrong, doesn't containt 'doctolib.fr' : {organization_profile_url}")
+            return None
+        p_url = p_url.split("?")[0]  # remove any additional unecessary parameters at end of link
+
+        # fetch all necessary data to sort out and classify our profile(s)
+        url = f"{p_url}.json"
+        json_data = DoctolibUrlCom().request_from_json_url(url)
+        if json_data is None:
+            utils.logger.error(f"[ERROR] link {url} couldn't fetch the json data. Does {organization_profile_url} have the format (...)doctolib.fr/type/city/name(...) ?")
+            return None
+        json_data = json_data.get("data", {})
+        for speciality in json_data["practitioners_by_speciality"].keys():
+            for pract_data in list(json_data["practitioners_by_speciality"][speciality]):
+                if "link" in pract_data.keys():
+                    link = pract_data["link"]
+                    pract_type = list(filter(None, link.split("/")))  # removes empty array, happens because link starts with a '/'
+                    if len(pract_type) == 3 and pract_type[0] in list(self.config_data['practitioner_types']):
+                        practitioner_urls.append(f"https://www.doctolib.fr{link}")
+        return practitioner_urls
 
     def find_available_slots(self):
         """
@@ -108,7 +158,7 @@ class AvailabilityReminder():
                 max_date = self.config_data["max_date_slot_for_reminder"]
  
         for p in self.practitioners:
-            self.logger.info(f"\nLooking for slots in {p.practitioner_name}'s calendar...")
+            self.logger.info(f"Looking for slots in {p.practitioner_name}'s calendar...")
             p.narrow_search_based_on_keywords(keywords=self.config_data["visiting_motive_keywords"], 
                                               forbidden_keywords=self.config_data["visiting_motive_forbidden_keywords"])
             found_slot = p.get_next_available_appointment()

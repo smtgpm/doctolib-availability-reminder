@@ -10,33 +10,58 @@ from DoctolibUrlCom import DoctolibUrlCom
 TRANSLATION_TABLE = str.maketrans("ëéèêàïîô'ç", "eeeeaiio-c")
 
 
+def fetch_json_data_from_profile_url(profile_url):
+    """
+    This function takes the URL of a profile on doctolib and returns the json data from it.
+    :param profile_url - url copy pasted from doctolib.fr's profile.
+    :return (slug_name, json_data) : (str, dict)
+    """
+    p_url = profile_url
+    if "doctolib.fr/" in p_url:
+        p_url = p_url.split("doctolib.fr/")[1]  # remove first part of the name
+    p_url = p_url.split("?")[0]                 # remove any aditional unecessary parameters at end of link
+    splitted_link = p_url.split("/")
+    if len(splitted_link) != 3:
+        utils.logger.error(f"[ERROR] link {profile_url} does not have format 'type/city/name'.")
+        return (None, None)
+    slug_name = splitted_link[2]
+
+    # fetch all necessary data to sort out and classify our profile(s)
+    url = f"https://www.doctolib.fr/online_booking/draft/new.json?id={slug_name}"
+    json_data = DoctolibUrlCom().request_from_json_url(url)
+    if json_data is None:
+        utils.logger.error(f"[ERROR] link {url} couldn't fetch the json data. Does {profile_url} have the format (...)doctolib.fr/type/city/name(...) ?")
+        return (None, None)
+    return (slug_name, json_data.get("data", {}))
+
+
 class Practitioner:
-    def __init__(self,
-                 glob_type,
-                 slug_name,
-                 city,
-                 json_data):
+    def __init__(self, slug_name, json_data):
+        """ 
+        :param slug_name - str : this is the name visible in a profile's URL. Usually it's the first-and-lastname without any special characters
+        :param json_data - dict: data retrieved from the response of https://www.doctolib.fr/online_booking/draft/new.json?id=<slug_name>
+        """
         self.is_ok = False
         self.logger = utils.logger
         try:
             if not json_data["profile"]["speciality"] or \
                not json_data["visit_motives"]         or \
                not json_data["agendas"]                   :
-                raise Exception(f"the json_data provided is missing mandatory data, here is a dump of the data for debug:\n{json_data}")
-            self.glob_type = glob_type
+                self.logger.debug(f"the json_data provided is missing mandatory data, here is a dump of the data for debug:\n{json_data}")
+                raise Exception(f"the json_data provided is missing mandatory data")
             self.slug_name = slug_name
-            self.city = city
             self.next_slots = []
             
             # fetch all necessary data :
+            self.glob_type = json_data["profile"]["speciality"]["slug"]
             self.speciality_id = json_data["profile"]["speciality"]["id"]
             self.practitioner_name = json_data["profile"]["name_with_title"]
             self.speciality_name = json_data["profile"]["speciality"]["name"]
             
-            self.practice_id_address = {}
+            self.practice_address_by_id = {}
             for place in json_data["places"]:
                 for practice_id in place["practice_ids"]:
-                    self.practice_id_address[practice_id] = f"{place['address']}, {place['zipcode']} {place['city']}"
+                    self.practice_address_by_id[practice_id] = f"{place['address']}, {place['zipcode']} {place['city']}"
 
             self.visit_motives = {}
             for vm in list(json_data["visit_motives"]):
@@ -55,40 +80,6 @@ class Practitioner:
         except Exception as e:
             self.logger.error(f"Failed to create a Practitionner object:\n{e}")
 
-    
-    @classmethod
-    def from_url(cls, profile_url):
-        """
-        :param profile_url - url copy pasted from doctolib.fr's profile
-        """
-        purl = profile_url
-        if "doctolib.fr/" in purl:
-            purl = purl.split("doctolib.fr/")[1]  # remove first part of the name
-            purl = purl.split("?")[0]             # remove any aditional unecessary parameters at end of link
-        splitted_link = purl.split("/")
-        if len(splitted_link) != 3:
-            cls.logger.error(f"[ERROR] link {profile_url} does not have format 'type/city/name'.")
-            return
-        glob_type = splitted_link[0]
-        city = splitted_link[1]
-        slug_name = splitted_link[2]
-
-        # fetch all necessary data to sort out and classify our profile(s)
-        url = f"https://www.doctolib.fr/online_booking/draft/new.json?id={slug_name}"
-        json_data = DoctolibUrlCom().request_from_json_url(url)
-        if json_data is None:
-            cls.logger.error(f"[ERROR] link {url} couldn't fetch the json data. Does {profile_url} have the format (...)doctolib.fr/type/city/name(...) ?")
-            return
-        
-        json_data = json_data.get("data", {})
-        # if data["profile"]["speciality"] exists and is not null and not an array, this means we have a practitionner. 
-        # Else it is a center/pharmacy/hospital and thus needs trimming
-        if json_data["profile"]["speciality"]:
-            return cls(glob_type, slug_name, city, json_data)
-        else:
-            cls.logger.error(f"Problem when trying to fetch speciality in profiles url : {url}")
-            return
-
     def narrow_search_based_on_keywords(self, keywords=[], forbidden_keywords=[]):
         """
         Some practitionners have way too many agendas and/or visit motives, and he/she might have an abailability on some visit motive
@@ -96,7 +87,7 @@ class Practitioner:
         """
         keywords = [k.lower().translate(TRANSLATION_TABLE) for k in keywords]
         forbidden_keywords = [k.lower().translate(TRANSLATION_TABLE) for k in forbidden_keywords]
-        self.logger.info(f"Removing any visit_motive or agenda to narrow the availability search.\nLooking for these keywords: {keywords}\nRefusing these keywords:{forbidden_keywords}")
+        self.logger.debug(f"Removing any visit_motive or agenda to narrow the availability search.\nLooking for these keywords: {keywords}\nRefusing these keywords:{forbidden_keywords}")
 
         # first we trim the visit motives. We'll remove any motive that has a forbidden keyword, and keep the ones that have the
         # highest number of matches with keywords
@@ -133,7 +124,7 @@ class Practitioner:
         if len(self.visit_motives) == 0 or len(self.agendas) == 0:
             self.logger.error("There are no more available agendas or visit_motives. Verify your 'forbidden_keywords' as they might be too restrictive")
             return None
-        self.logger.info(f"SUCCESS: {len(motiv_ids_to_remove)} visit_motives have been removed and {len(agenda_ids_to_remove)} agendas.")
+        self.logger.debug(f"SUCCESS: {len(motiv_ids_to_remove)} visit_motives have been removed and {len(agenda_ids_to_remove)} agendas.")
 
     def get_next_available_appointment(self):
         """ will parse all agendas and visit motives of current practitionner, and look at the next available slots """
@@ -172,5 +163,5 @@ if __name__ == "__main__":
         if found_slot:
             print(f"At least one available slot has been found for {my_pract.practitioner_name}:")
             for slot in my_pract.next_slots:
-                print(f"for \"{my_pract.visit_motives[slot['motive_id']]}\", next available slot will be : {slot['date']} at {my_pract.practice_id_address[slot['practice_id']]}")
+                print(f"for \"{my_pract.visit_motives[slot['motive_id']]}\", next available slot will be : {slot['date']} at {my_pract.practice_address_by_id[slot['practice_id']]}")
             
