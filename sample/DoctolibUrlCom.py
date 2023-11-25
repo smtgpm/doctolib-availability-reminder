@@ -54,9 +54,16 @@ class DoctolibUrlCom(metaclass=Singleton):
     class that will communicate with doctolib.fr. Used mainly torequest and track amount
     of requests as to not become banned, so there should only be one instance of this class
     """
-    def __init__(self):
-        url_com_data = utils.get_file_json_data(URL_COM_FILE)
+    def __init__(self, save_url_request_time=False, *args, **kwargs):
+        self.save_url_request_time = save_url_request_time
+        self._builtin_open = open  # to be able to call it during destruction
         self.logger =  utils.logger
+         
+        if self.save_url_request_time:
+            url_com_data = utils.get_file_json_data(URL_COM_FILE)
+        else:
+            url_com_data = None
+            return
         if url_com_data and {'MAIN_DOCTOLIB_FR', 'AVALIABILITIES', 'ONLINE_BOOKING'}.issubset(url_com_data.keys()):
             self._requests_dates = {
                 UrlType.MAIN_DOCTOLIB_FR: url_com_data['MAIN_DOCTOLIB_FR'],
@@ -69,10 +76,10 @@ class DoctolibUrlCom(metaclass=Singleton):
                 UrlType.AVALIABILITIES: [],
                 UrlType.ONLINE_BOOKING: []
             }
-        self._builtin_open = open  # to be able to call it during destruction 
 
     def __del__(self):
-        self.dump_to_url_com_file()
+        if self.save_url_request_time:
+            self.dump_to_url_com_file()
 
     def dump_to_url_com_file(self):
         dump_data = {
@@ -100,8 +107,9 @@ class DoctolibUrlCom(metaclass=Singleton):
             except requests.exceptions.RequestException as e:
                 self.logger.error(f"Error: Unable to fetch JSON data from the URL: {e}")
                 return None
-            self._requests_dates[url_type].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"))
-            self.dump_to_url_com_file()
+            if self.save_url_request_time:
+                self._requests_dates[url_type].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"))
+                self.dump_to_url_com_file()
             return utils.CustomJSON(json_data)
         else:
             return None
@@ -112,7 +120,7 @@ class DoctolibUrlCom(metaclass=Singleton):
         """
         if type(url_type) != UrlType or url_type == UrlType.NONE:
             return False
-        elif url_type == UrlType.UNKNOWN:
+        elif url_type == UrlType.UNKNOWN or not self.save_url_request_time:
             return True
         
         curr_time = datetime.now()

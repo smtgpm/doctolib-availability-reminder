@@ -197,5 +197,6 @@ class AvailabilityReminder():
             self.email_sender.send_email()
             
 if __name__ == "__main__":
+    duc = DoctolibUrlCom()
     ar = AvailabilityReminder()
     ar.run()

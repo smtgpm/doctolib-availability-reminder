@@ -55,3 +55,10 @@ max_dist_from_address_km: 5.0
 practitioner_types:
   - dentiste
 
+
+#################################
+######### SOFTWARE_CONFG ########
+#################################
+
+# not used yet
+save_url_request_time: false

@@ -95,13 +95,13 @@ class Practitioner:
         for _, motive in self.visit_motives.items():
             highest_num_of_keyword_matches = max(highest_num_of_keyword_matches, sum(k in motive for k in keywords))
 
-        motiv_ids_to_remove = []
+        motive_ids_to_remove = []
         for id, motive in self.visit_motives.items():
             if any(word in motive for word in forbidden_keywords) or sum(word in motive for word in keywords) < highest_num_of_keyword_matches:
-                motiv_ids_to_remove.append(id)
+                motive_ids_to_remove.append(id)
 
-        # Removing items from 'self.visit_motives' based on 'motiv_ids_to_remove'
-        for id in motiv_ids_to_remove:
+        # Removing items from 'self.visit_motives' based on 'motive_ids_to_remove'
+        for id in motive_ids_to_remove:
             self.visit_motives.pop(id, None)
 
         # no we can trim the agendas
@@ -124,7 +124,7 @@ class Practitioner:
         if len(self.visit_motives) == 0 or len(self.agendas) == 0:
             self.logger.error("There are no more available agendas or visit_motives. Verify your 'forbidden_keywords' as they might be too restrictive")
             return None
-        self.logger.debug(f"SUCCESS: {len(motiv_ids_to_remove)} visit_motives have been removed and {len(agenda_ids_to_remove)} agendas.")
+        self.logger.debug(f"SUCCESS: {len(motive_ids_to_remove)} visit_motives have been removed and {len(agenda_ids_to_remove)} agendas.")
 
     def get_next_available_appointment(self):
         """ will parse all agendas and visit motives of current practitionner, and look at the next available slots """
