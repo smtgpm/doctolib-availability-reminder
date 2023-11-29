@@ -1,4 +1,4 @@
-# Currently only functions locally, or at least not on AWS, as AWS seems to be blacklisted for parsing some doctolib URLS that are necessary.
+# Currently only runs locally, or at least not on AWS, as AWS seem to blacklist some doctolib URLs that are necessary.
 
 # Doctolib availability reminder
 
