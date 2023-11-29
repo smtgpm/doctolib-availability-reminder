@@ -28,6 +28,7 @@ def fetch_json_data_from_profile_url(profile_url):
 
     # fetch all necessary data to sort out and classify our profile(s)
     url = f"https://www.doctolib.fr/online_booking/draft/new.json?id={slug_name}"
+    utils.logger.info(f"Profile URL : {url}")
     json_data = DoctolibUrlCom().request_from_json_url(url)
     if json_data is None:
         utils.logger.error(f"[ERROR] link {url} couldn't fetch the json data. Does {profile_url} have the format (...)doctolib.fr/type/city/name(...) ?")

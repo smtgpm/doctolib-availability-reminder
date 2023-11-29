@@ -3,7 +3,7 @@
 ########## MAIN_CONFIG ##########
 #################################
 # if set to true, please refer to the SEARCH_AROUND_ADDRESS section for additional configuration
-search_around_address: true
+search_around_address: false
 
 # following keywords are used to narrow the parsing. Each practitionner does not have the same availability for all their
 # visiting motives, so adding keywords will make the reminders more precise as you won't be reminded for unwanted visiting motives.

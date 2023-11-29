@@ -76,6 +76,7 @@ class AvailabilityReminder():
             base_url = "https://www.doctolib.fr"
             url = f"{base_url}/{practitioner_type}/{city}-{street_name}.json"
 
+            self.logger.info(f"Address URL to parse : {url}")
             # and finally we go and parse the url, retrieve all practitioner names around given adress.
             # TODO: figure out a way to parse more than 1 page (ie more than 20 results)
             json_data = DoctolibUrlCom().request_from_json_url(url)
