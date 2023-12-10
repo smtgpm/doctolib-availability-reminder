@@ -44,42 +44,43 @@ class Practitioner:
         """
         self.is_ok = False
         self.logger = utils.logger
-        try:
-            if not json_data["profile"]["speciality"] or \
-               not json_data["visit_motives"]         or \
-               not json_data["agendas"]                   :
-                self.logger.debug(f"the json_data provided is missing mandatory data, here is a dump of the data for debug:\n{json_data}")
-                raise Exception(f"the json_data provided is missing mandatory data")
-            self.slug_name = slug_name
-            self.next_slots = []
-            
-            # fetch all necessary data :
-            self.glob_type = json_data["profile"]["speciality"]["slug"]
-            self.speciality_id = json_data["profile"]["speciality"]["id"]
-            self.practitioner_name = json_data["profile"]["name_with_title"]
-            self.speciality_name = json_data["profile"]["speciality"]["name"]
-            
-            self.practice_address_by_id = {}
-            for place in json_data["places"]:
-                for practice_id in place["practice_ids"]:
-                    self.practice_address_by_id[practice_id] = f"{place['address']}, {place['zipcode']} {place['city']}"
+        if json_data:
+            try:
+                if not json_data["profile"]["speciality"] or \
+                not json_data["visit_motives"]         or \
+                not json_data["agendas"]                   :
+                    self.logger.debug(f"the json_data provided is missing mandatory data, here is a dump of the data for debug:\n{json_data}")
+                    raise Exception(f"the json_data provided is missing mandatory data")
+                self.slug_name = slug_name
+                self.next_slots = []
+                
+                # fetch all necessary data :
+                self.glob_type = json_data["profile"]["speciality"]["slug"]
+                self.speciality_id = json_data["profile"]["speciality"]["id"]
+                self.practitioner_name = json_data["profile"]["name_with_title"]
+                self.speciality_name = json_data["profile"]["speciality"]["name"]
+                
+                self.practice_address_by_id = {}
+                for place in json_data["places"]:
+                    for practice_id in place["practice_ids"]:
+                        self.practice_address_by_id[practice_id] = f"{place['address']}, {place['zipcode']} {place['city']}"
 
-            self.visit_motives = {}
-            for vm in list(json_data["visit_motives"]):
-                if (vm["speciality_id"] != self.speciality_id):
-                    continue
-                self.visit_motives[vm["id"]] = vm["name"].lower().translate(TRANSLATION_TABLE)
+                self.visit_motives = {}
+                for vm in list(json_data["visit_motives"]):
+                    if (vm["speciality_id"] != self.speciality_id):
+                        continue
+                    self.visit_motives[vm["id"]] = vm["name"].lower().translate(TRANSLATION_TABLE)
 
-            self.agendas = {}
-            for ag in list(json_data["agendas"]):
-                if ag["booking_disabled"] or ag["booking_temporary_disabled"] or ag["speciality_id"] != self.speciality_id:
-                    continue
-                self.agendas[ag["id"]] = ag["visit_motive_ids_by_practice_id"]  # ag["visit_motive_ids_by_practice_id"] is a dictionnary :  key = practice id, item = [motive ids]
+                self.agendas = {}
+                for ag in list(json_data["agendas"]):
+                    if ag["booking_disabled"] or ag["booking_temporary_disabled"] or ag["speciality_id"] != self.speciality_id:
+                        continue
+                    self.agendas[ag["id"]] = ag["visit_motive_ids_by_practice_id"]  # ag["visit_motive_ids_by_practice_id"] is a dictionnary :  key = practice id, item = [motive ids]
 
-            self.is_ok = True
-            self.logger.info(f"Practitioner {self.practitioner_name}'s object was successfully created")
-        except Exception as e:
-            self.logger.error(f"Failed to create a Practitionner object:\n{e}")
+                self.is_ok = True
+                self.logger.info(f"Practitioner {self.practitioner_name}'s object was successfully created")
+            except Exception as e:
+                self.logger.error(f"Failed to create a Practitionner object:\n{e}")
 
     def narrow_search_based_on_keywords(self, keywords=[], forbidden_keywords=[]):
         """

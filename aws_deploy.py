@@ -63,10 +63,12 @@ def create_zip(update_requirements=False):
                 # Calculate the relative path inside the zip file
                 relative_path = os.path.relpath(file_path, 'requirements')
                 zipf.write(file_path, arcname=relative_path)
+    print("finished creating zip")
 
 
 # Upload the zip file to S3
 def upload_to_s3():
+    print("uploading to s3...")
     s3 = boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY_ID, aws_secret_access_key=AWS_SECRET_ACCESS_KEY, region_name=AWS_REGION)
     s3.upload_file(f'{PROJECT_NAME}.zip', S3_BUCKET_NAME, f'{PROJECT_NAME}.zip')
 
@@ -142,12 +144,14 @@ def invoke_lambda(lambda_function_name, s3_bucket, s3_key):
 
 # Main function
 def main():
-    create_zip()
+    create_zip(False)
     upload_to_s3()
     create_or_update_lambda_function(LAMBDA_FUNCTION_NAME)
     update_lambda_environment_with_retries()
     invoke_lambda(LAMBDA_FUNCTION_NAME, S3_BUCKET_NAME, f'{PROJECT_NAME}.zip')
     print("Project zipped, uploaded to S3, and Lambda function invoked")
+
+
 
 if __name__ == "__main__":
     main()

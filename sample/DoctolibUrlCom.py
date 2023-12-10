@@ -10,6 +10,7 @@ import requests
 from enum import Enum
 from pathlib import Path
 from datetime import datetime
+from requests_ip_rotator import ApiGateway
 
 sys.path.insert(0, "sample")
 import utils
@@ -58,7 +59,9 @@ class DoctolibUrlCom(metaclass=Singleton):
         self.save_url_request_time = save_url_request_time
         self._builtin_open = open  # to be able to call it during destruction
         self.logger =  utils.logger
-         
+        self.gateway_doctoliburl = ApiGateway("http://www.doctolib.fr")
+        self.gateway_doctoliburl.start()
+        self.session = requests.Session()         
         if self.save_url_request_time:
             url_com_data = utils.get_file_json_data(URL_COM_FILE)
         else:
@@ -80,7 +83,7 @@ class DoctolibUrlCom(metaclass=Singleton):
     def __del__(self):
         if self.save_url_request_time:
             self.dump_to_url_com_file()
-
+    
     def dump_to_url_com_file(self):
         dump_data = {
             'MAIN_DOCTOLIB_FR': self._requests_dates[UrlType.MAIN_DOCTOLIB_FR],
@@ -98,15 +101,16 @@ class DoctolibUrlCom(metaclass=Singleton):
         url_type = self.get_url_type(url)
         if self.is_request_allowed(url_type):
             try:
+                self.session.mount(url, self.gateway_doctoliburl)
                 headers = {
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
                 }
-                response = requests.get(url, headers=headers)
+                response = self.session.get(url, headers=headers)
                 response.raise_for_status()  # Check for any request errors
                 json_data = response.json()
             except requests.exceptions.RequestException as e:
                 self.logger.error(f"Error: Unable to fetch JSON data from the URL: {e}")
-                return None
+                return False
             if self.save_url_request_time:
                 self._requests_dates[url_type].append(datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"))
                 self.dump_to_url_com_file()
@@ -147,3 +151,8 @@ class DoctolibUrlCom(metaclass=Singleton):
         else:
             url_type = UrlType.NONE
         return url_type
+
+if __name__ == "__main__":
+    url = "https://www.doctolib.fr/availabilities.json?start_date=2000-01-01&visit_motive_ids=2762807&agenda_ids=454863&practice_ids=182142&limit=2"
+    dul = DoctolibUrlCom()
+    dul.request_from_json_url(url)

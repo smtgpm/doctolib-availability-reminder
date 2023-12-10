@@ -196,6 +196,8 @@ class AvailabilityReminder():
             self.email_sender.create_email_message(subject="[Doctolib Availability Reminder] New slots available !",
                                                    message=self.email_message)  # assuming environment variable ES_RECEIPIENTS is set
             self.email_sender.send_email()
+        else:
+            self.logger.info("no available slots were found")
             
 if __name__ == "__main__":
     duc = DoctolibUrlCom()
